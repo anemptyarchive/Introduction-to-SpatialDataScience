@@ -1,6 +1,6 @@
 # 『Pythonで学ぶ空間データサイエンス入門』のノート
 # 第4章 地理的加重回帰モデルと最小二乗法
-# 4.3.2-3 GWRモデルの重み行列の可視化
+# 4.3.2 GWRモデルの重み行列の可視化
 
 # %%
 
@@ -29,70 +29,100 @@ coord_arr = np.stack(
 
 # %%
 
+### 重み関数の実装 --------------------------------------------------------------
+
+# 重み関数を定義
+def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
+
+    # 変数を設定
+    d = distance
+    b = bandwidth
+
+    # 対角要素を計算
+    if fnc == 'moving window':
+
+        # moving window型
+        w = np.ones_like(d)
+        w[d >= b] = 0.0
+
+    elif fnc == 'exponential':
+
+        # バンド幅を調整
+        if adjust_flag:
+            b *= 1.0 / 3.0
+
+        # 指数型
+        w = np.exp(- d / b)
+
+    elif fnc == 'Gaussian':
+
+        # バンド幅を調整
+        if adjust_flag:
+            b *= 1.0 / np.sqrt(6.0)
+
+        # ガウス型
+        w = np.exp(-0.5 * (d / b)**2)
+
+    elif fnc == 'bi-square':
+
+        # bi-square型
+        w = (1.0 - (d / b)**2)**2
+        w[d >= b] = 0.0
+
+    elif fnc == 'tri-cube':
+
+        # tri-cube型
+        w = (1.0 - (d / b)**3)**3
+        w[d >= b] = 0.0
+
+    # 重み行列を作成
+    W = np.diag(w)
+
+    return W
+
+
+# %%
+
 ### 重み関数の設定 --------------------------------------------------------------
 
 # 重み関数を指定
 #fnc_label = 'moving window'
+#fnc_label = 'exponential'
 #fnc_label = 'Gaussian'
 fnc_label = 'bi-square'
-
-# 重み関数を設定
-if fnc_label == 'moving window':
-
-    # moving window関数を実装
-    def weight_fnc(dist, b):
-
-        # 対角要素を計算
-        w_diag = np.ones_like(dist)
-        w_diag[dist >= b] = 0.0
-
-        # 重み行列を作成
-        W = np.diag(w_diag)
-
-        return W
-
-elif fnc_label == 'Gaussian':
-
-    # Gaussian関数を実装
-    def weight_fnc(dist, b):
-
-        # 対角要素を計算
-        w_diag = np.exp(-0.5 * (dist / b)**2)
-
-        # 重み行列を作成
-        W = np.diag(w_diag)
-
-        return W
-
-elif fnc_label == 'bi-square':
-
-    # bi-square関数を実装
-    def weight_fnc(dist, b):
-
-        # 対角要素を計算
-        w_diag = (1.0 - (dist / b)**2)**2
-        w_diag[dist >= b] = 0.0
-
-        # 重み行列を作成
-        W = np.diag(w_diag)
-
-        return W
+#fnc_label = 'tri-cube'
 
 # ラベル用の文字列を設定
 if fnc_label == 'moving window':
-    
+
+    # moving window型
     fml_label  = '$w_{ijj} = 1 ~ (d_{ij} < b)$\n'
     fml_label += '$w_{ijj} = 0 ~ (d_{ij} \\geq b)$\n'
     fml_label += '$w_{ijl} = 0 ~ (j \\neq l)$'
 
+elif fnc_label == 'exponential':
+    
+    # 指数型
+    fml_label  = '$w_{ijj} = \\exp(- \\frac{d_{ij}}{b})$\n'
+    fml_label += '$w_{ijl} = 0 ~ (j \\neq l)$'
+
 elif fnc_label == 'Gaussian':
     
+    # ガウス型
     fml_label  = '$w_{ijj} = \\exp(- \\frac{1}{2} (\\frac{d_{ij}}{b})^2)$\n'
     fml_label += '$w_{ijl} = 0 ~ (j \\neq l)$'
 
 elif fnc_label == 'bi-square':
 
+    # bi-square型
     fml_label  = '$w_{ijj} = (1 - (\\frac{d_{ij}}{b})^2)^2 ~ (d_{ij} < b)$\n'
+    fml_label += '$w_{ijj} = 0 ~ (d_{ij} \\geq b)$\n'
+    fml_label += '$w_{ijl} = 0 ~ (j \\neq l)$'
+
+elif fnc_label == 'tri-cube':
+
+    # tri-cube型
+    fml_label  = '$w_{ijj} = (1 - (\\frac{d_{ij}}{b})^3)^3 ~ (d_{ij} < b)$\n'
     fml_label += '$w_{ijj} = 0 ~ (d_{ij} \\geq b)$\n'
     fml_label += '$w_{ijl} = 0 ~ (j \\neq l)$'
 
@@ -107,6 +137,9 @@ N = len(geom_df)
 # バンド幅を指定
 b = 270000.0
 
+# 有効バンド幅を設定
+adjust_flag = False
+
 # 地点ごとに計算
 dist_lt   = []
 weight_lt = []
@@ -117,7 +150,7 @@ for i in range(N):
     dist_vec = np.sqrt(np.sum((coord_arr - coord_arr[i])**2, axis=1))
 
     # 重み行列を計算
-    W = weight_fnc(dist_vec, b)
+    W = weight_functions(dist_vec, b, fnc_label, adjust_flag)
 
     # 計算結果を格納
     dist_lt.append(dist_vec.copy())
@@ -138,7 +171,7 @@ dist_max = np.ceil(dist_max /u)*u
 dist_line = np.linspace(start=0.0, stop=dist_max, num=5001)
 
 # 重み関数を計算
-weight_line = np.diag(weight_fnc(dist_line, b))
+weight_line = np.diag(weight_functions(dist_line, b, fnc_label, adjust_flag))
 
 # グラフオブジェクトを初期化
 fig, axes = plt.subplots(nrows=1, ncols=3, 
@@ -212,7 +245,7 @@ ani = FuncAnimation(fig=fig, func=update, frames=N, interval=500)
 
 # 動画を書出
 ani.save(
-    filename='../../figure/ch4/weight_matrix/weight_'+fnc_label+'_i.mp4', 
+    filename='../../figure/GWR/weight_matrix/weight_'+fnc_label+'_i.mp4', 
     progress_callback = lambda i, n: print(f'frame: {i} / {n}')
 )
 
@@ -226,6 +259,9 @@ frame_num = 101
 
 # バンド幅の範囲を指定
 b_vals = np.linspace(start=0.0, stop=500000.0, num=frame_num)
+
+# 有効バンド幅を設定
+adjust_flag = False
 
 # 地点数を取得
 N = len(geom_df)
@@ -244,7 +280,7 @@ for frame_i in range(frame_num):
     b = b_vals[frame_i]
 
     # 重み行列を計算
-    W = weight_fnc(dist_vec, b)
+    W = weight_functions(dist_vec, b, fnc_label, adjust_flag)
 
     # 計算結果を格納
     weight_lt.append(W.copy())
@@ -288,7 +324,7 @@ def update(frame_i):
     W = weight_lt[frame_i]
 
     # 重み関数を計算
-    weight_line = np.diag(weight_fnc(dist_line, b))
+    weight_line = np.diag(weight_functions(dist_line, b, fnc_label, adjust_flag))
 
     # 重み関数を描画
     ax = axes[0]
@@ -342,7 +378,7 @@ ani = FuncAnimation(fig=fig, func=update, frames=frame_num, interval=100)
 
 # 動画を書出
 ani.save(
-    filename='../../figure/ch4/weight_matrix/weight_'+fnc_label+'_b.mp4', 
+    filename='../../figure/GWR/weight_matrix/weight_'+fnc_label+'_b.mp4', 
     progress_callback = lambda i, n: print(f'frame: {i} / {n}')
 )
 
