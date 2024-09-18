@@ -97,6 +97,12 @@ def update(frame_i):
     # バンド幅を取得
     b = b_vals[frame_i]
 
+    # ラベル用の文字列を作成
+    if adjust_flag:
+        param_label = f'$b^{{*}} = {b:.1f}$'
+    else:
+        param_label = f'$b = {b:.1f}$'
+
     # 重み関数を描画
     ax.vlines(x=b, ymin=w_min, ymax=w_max, 
             color='red', linewidth=2.0, linestyle='dashed') # バンド幅
@@ -107,7 +113,7 @@ def update(frame_i):
                 label=fnc_label) # 重み曲線
     ax.set_xlabel('distance ($d$)')
     ax.set_ylabel('weight ($w$)')
-    ax.set_title(f'$b = {b:.1f}$', loc='left')
+    ax.set_title(param_label, loc='left')
     fig.suptitle('weight function', fontsize=20)
     ax.set_ylim(ymin=w_min, ymax=w_max)
     ax.grid()

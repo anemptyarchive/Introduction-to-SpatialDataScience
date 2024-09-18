@@ -173,6 +173,12 @@ dist_line = np.linspace(start=0.0, stop=dist_max, num=5001)
 # 重み関数を計算
 weight_line = np.diag(weight_functions(dist_line, b, fnc_label, adjust_flag))
 
+# ラベル用の文字列を作成
+if adjust_flag:
+    param_label = f'$b^{{*}} = {b:.1f}$'
+else:
+    param_label = f'$b = {b:.1f}$'
+
 # グラフオブジェクトを初期化
 fig, axes = plt.subplots(nrows=1, ncols=3, 
                          figsize=(15, 5), dpi=100, facecolor='white', 
@@ -199,7 +205,7 @@ def update(i):
                c='black', s=10) # 各地点の値
     ax.set_xlabel('distance ($d_{ij}$)')
     ax.set_ylabel('weight ($w_{ijj}$)')
-    ax.set_title(f'$b = {b:.1f}$', loc='left')
+    ax.set_title(param_label, loc='left')
     ax.set_ylim(ymin=w_min, ymax=w_max)
     ax.grid()
     ax.legend()
@@ -325,6 +331,12 @@ def update(frame_i):
 
     # 重み関数を計算
     weight_line = np.diag(weight_functions(dist_line, b, fnc_label, adjust_flag))
+    
+    # ラベル用の文字列を作成
+    if adjust_flag:
+        param_label = f'$b^{{*}} = {b:.1f}$'
+    else:
+        param_label = f'$b = {b:.1f}$'
 
     # 重み関数を描画
     ax = axes[0]
@@ -336,7 +348,7 @@ def update(frame_i):
                c='black', s=10) # 各地点の値
     ax.set_xlabel('distance ($d_{ij}$)')
     ax.set_ylabel('weight ($w_{ijj}$)')
-    ax.set_title(f'$b = {b:.1f}$', loc='left')
+    ax.set_title(param_label, loc='left')
     ax.set_ylim(ymin=w_min, ymax=w_max)
     ax.grid()
     ax.legend()
