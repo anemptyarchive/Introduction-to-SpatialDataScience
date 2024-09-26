@@ -32,20 +32,20 @@ coord_arr = np.stack(
 ### 重み関数の実装 --------------------------------------------------------------
 
 # 重み関数を定義
-def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
+def weight_functions(distance, bandwidth, function='bi-square', adjust_flag=False):
 
     # 変数を設定
     d = distance
     b = bandwidth
 
     # 対角要素を計算
-    if fnc == 'moving window':
+    if function == 'moving window':
 
         # moving window型
         w = np.ones_like(d)
         w[d >= b] = 0.0
 
-    elif fnc == 'exponential':
+    elif function == 'exponential':
 
         # バンド幅を調整
         if adjust_flag:
@@ -54,7 +54,7 @@ def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
         # 指数型
         w = np.exp(- d / b)
 
-    elif fnc == 'Gaussian':
+    elif function == 'Gaussian':
 
         # バンド幅を調整
         if adjust_flag:
@@ -63,13 +63,13 @@ def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
         # ガウス型
         w = np.exp(-0.5 * (d / b)**2)
 
-    elif fnc == 'bi-square':
+    elif function == 'bi-square':
 
         # bi-square型
         w = (1.0 - (d / b)**2)**2
         w[d >= b] = 0.0
 
-    elif fnc == 'tri-cube':
+    elif function == 'tri-cube':
 
         # tri-cube型
         w = (1.0 - (d / b)**3)**3
@@ -161,10 +161,10 @@ for i in range(N):
 w_min = -0.1
 w_max = 1.1
 u = 50000 # 切り下げ・切り上げの単位を指定
-lng_min = np.floor(geom_df.bounds.minx.min() /u)*u
-lng_max = np.ceil(geom_df.bounds.maxx.max()  /u)*u
-lat_min = np.floor(geom_df.bounds.miny.min() /u)*u
-lat_max = np.ceil(geom_df.bounds.maxy.max()  /u)*u
+u_min = np.floor(geom_df.bounds.minx.min() /u)*u
+u_max = np.ceil(geom_df.bounds.maxx.max()  /u)*u
+v_min = np.floor(geom_df.bounds.miny.min() /u)*u
+v_max = np.ceil(geom_df.bounds.maxy.max()  /u)*u
 dist_max = np.ceil(dist_max /u)*u
 
 # 距離の範囲を設定
@@ -208,19 +208,18 @@ def update(i):
     ax.set_title(param_label, loc='left')
     ax.set_ylim(ymin=w_min, ymax=w_max)
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper right')
 
     # 重みを格納
     geom_df['weight'] = np.diag(W)
 
     # 基準地点の位置を取得
-    lng0 = target_df.X.values.item()
-    lat0 = target_df.Y.values.item()
+    u_i, v_i = coord_arr[i]
 
     # バンド幅の範囲を計算
-    t_vec   = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
-    lng_vec = lng0 + b * np.cos(t_vec)
-    lat_vec = lat0 + b * np.sin(t_vec)
+    t_vec = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
+    u_vec = u_i + b * np.cos(t_vec)
+    v_vec = v_i + b * np.sin(t_vec)
 
     # 重みのコロプレス図を描画
     ax = axes[1]
@@ -228,12 +227,14 @@ def update(i):
                  edgecolor='white', linewidth=0.5) # 各地点の値
     geom_df.centroid.plot(ax=ax, c='black', markersize=5) # 各地点
     target_df.centroid.plot(ax=ax, c='red', markersize=50) # 基準地点
-    ax.plot(lng_vec, lat_vec, 
+    ax.plot(u_vec, v_vec, 
             color='red', linewidth=2.0, linestyle='dashed') # バンド幅
-    ax.set_xlim(xmin=lng_min, xmax=lng_max)
-    ax.set_ylim(ymin=lat_min, ymax=lat_max)
-    ax.set_title(f'$N = {N}, i = {i}, '+'(w_{i11}, \cdots, w_{iNN})$', loc='left')
+    ax.set_xlabel('$u_j$')
+    ax.set_ylabel('$v_j$')
+    ax.set_title(f'$N = {N}, i = {i+1}, '+'(w_{i11}, \cdots, w_{iNN})$', loc='left')
     ax.grid()
+    ax.set_xlim(xmin=u_min, xmax=u_max)
+    ax.set_ylim(ymin=v_min, ymax=v_max)
     ax.set_aspect('equal', adjustable='box')
 
     # 重み行列を描画
@@ -242,7 +243,7 @@ def update(i):
     ax.invert_yaxis() # 軸の反転
     ax.set_xlabel('$l$')
     ax.set_ylabel('$j$')
-    ax.set_title('$W_{i} = (w_{i11}, \cdots, w_{ijl}, \cdots, w_{iNN})$', loc='left')
+    ax.set_title('$W_i = (w_{i11}, \cdots, w_{ijl}, \cdots, w_{iNN})$', loc='left')
     ax.grid()
     ax.set_aspect('equal', adjustable='box')
 
@@ -295,21 +296,17 @@ for frame_i in range(frame_num):
 w_min = -0.1
 w_max = 1.1
 u = 50000 # 切り下げ・切り上げの単位を指定
-lng_min = np.floor(geom_df.bounds.minx.min() /u)*u
-lng_max = np.ceil(geom_df.bounds.maxx.max()  /u)*u
-lat_min = np.floor(geom_df.bounds.miny.min() /u)*u
-lat_max = np.ceil(geom_df.bounds.maxy.max()  /u)*u
+u_min = np.floor(geom_df.bounds.minx.min() /u)*u
+u_max = np.ceil(geom_df.bounds.maxx.max()  /u)*u
+v_min = np.floor(geom_df.bounds.miny.min() /u)*u
+v_max = np.ceil(geom_df.bounds.maxy.max()  /u)*u
 dist_max = np.ceil(max(dist_vec.max(), b_vals.max()) /u)*u
 
 # 距離の範囲を設定
 dist_line = np.linspace(start=0.0, stop=dist_max, num=5001)
 
-# 基準地点を抽出
-target_df = geom_df.loc[i:i]
-
 # 基準地点の位置を取得
-lng0 = target_df.X.values.item()
-lat0 = target_df.Y.values.item()
+u_i, v_i = coord_arr[i]
 
 # グラフオブジェクトを初期化
 fig, axes = plt.subplots(nrows=1, ncols=3, 
@@ -351,28 +348,32 @@ def update(frame_i):
     ax.set_title(param_label, loc='left')
     ax.set_ylim(ymin=w_min, ymax=w_max)
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper right')
 
     # 重みを格納
     geom_df['weight'] = np.diag(W)
 
     # バンド幅の範囲を計算
-    t_vec   = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
-    lng_vec = lng0 + b * np.cos(t_vec)
-    lat_vec = lat0 + b * np.sin(t_vec)
+    t_vec = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
+    u_vec = u_i + b * np.cos(t_vec)
+    v_vec = v_i + b * np.sin(t_vec)
 
     # 重みのコロプレス図を描画
     ax = axes[1]
     geom_df.plot(ax=ax, column='weight', vmin=0.0, vmax=1.0, 
                  edgecolor='white', linewidth=0.5) # 各地点の値
-    geom_df.centroid.plot(ax=ax, c='black', markersize=5) # 各地点
-    target_df.centroid.plot(ax=ax, c='red', markersize=50) # 基準地点
-    ax.plot(lng_vec, lat_vec, 
+    ax.scatter(x=coord_arr[:, 0], y=coord_arr[:, 1], 
+               color='black', s=5) # 各地点
+    ax.scatter(x=u_i, y=v_i, color='red', s=50, 
+               label='$(u_i, v_i)$') # 基準地点
+    ax.plot(u_vec, v_vec, 
             color='red', linewidth=2.0, linestyle='dashed') # バンド幅
-    ax.set_xlim(xmin=lng_min, xmax=lng_max)
-    ax.set_ylim(ymin=lat_min, ymax=lat_max)
-    ax.set_title(f'$N = {N}, i = {i}, '+'(w_{i11}, \cdots, w_{iNN})$', loc='left')
+    ax.set_xlabel('$u_j$')
+    ax.set_ylabel('$v_j$')
+    ax.set_title(f'$N = {N}, i = {i+1}, '+'(w_{i11}, \cdots, w_{iNN})$', loc='left')
     ax.grid()
+    ax.set_xlim(xmin=u_min, xmax=u_max)
+    ax.set_ylim(ymin=v_min, ymax=v_max)
     ax.set_aspect('equal', adjustable='box')
 
     # 重み行列を描画
@@ -381,7 +382,7 @@ def update(frame_i):
     ax.invert_yaxis() # 軸の反転
     ax.set_xlabel('$l$')
     ax.set_ylabel('$j$')
-    ax.set_title('$W_{i} = (w_{i11}, \cdots, w_{ijl}, \cdots, w_{iNN})$', loc='left')
+    ax.set_title('$W_i = (w_{i11}, \cdots, w_{ijl}, \cdots, w_{iNN})$', loc='left')
     ax.grid()
     ax.set_aspect('equal', adjustable='box')
 
@@ -396,6 +397,5 @@ ani.save(
 
 
 # %%
-
 
 

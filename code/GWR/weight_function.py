@@ -15,20 +15,20 @@ from matplotlib.animation import FuncAnimation
 ### 重み関数の実装 --------------------------------------------------------------
 
 # 重み関数を定義
-def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
+def weight_functions(distance, bandwidth, function='bi-square', adjust_flag=False):
 
     # 変数を設定
     d = distance
     b = bandwidth
 
     # 対角要素を計算
-    if fnc == 'moving window':
+    if function == 'moving window':
 
         # moving window型
         w = np.ones_like(d)
         w[d >= b] = 0.0
 
-    elif fnc == 'exponential':
+    elif function == 'exponential':
 
         # バンド幅を調整
         if adjust_flag:
@@ -37,7 +37,7 @@ def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
         # 指数型
         w = np.exp(- d / b)
 
-    elif fnc == 'Gaussian':
+    elif function == 'Gaussian':
 
         # バンド幅を調整
         if adjust_flag:
@@ -46,13 +46,13 @@ def weight_functions(distance, bandwidth, fnc='bi-square', adjust_flag=False):
         # ガウス型
         w = np.exp(-0.5 * (d / b)**2)
 
-    elif fnc == 'bi-square':
+    elif function == 'bi-square':
 
         # bi-square型
         w = (1.0 - (d / b)**2)**2
         w[d >= b] = 0.0
 
-    elif fnc == 'tri-cube':
+    elif function == 'tri-cube':
 
         # tri-cube型
         w = (1.0 - (d / b)**3)**3
