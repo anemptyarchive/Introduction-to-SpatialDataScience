@@ -23,7 +23,7 @@ print(PROJECT_DIR)
 # 書き出し先を設定
 dir_path  = PROJECT_DIR.as_posix()
 dir_path += '/figure/weights/' # パスを指定
-dir_path += 'adjacency_matrix_contiguity_contiguity/' # フォルダを指定
+dir_path += 'spatial_adjacency_matrix_by_contiguity/' # フォルダを指定
 print(dir_path)
 
 
@@ -48,13 +48,14 @@ from matplotlib.animation import FuncAnimation
 # データの読込 ------------------------------------------------------------------
 
 # ファイルパスを指定
-DISTRICT_PATH = 'data/nlftp/N03-20230101_27_GML/N03-23_27_230101.shp' # ポリゴンデータ:大阪府
+DISTRICT_PATH = 'data/nlftp/N03-20260101_27_GML/N03-20260101_27.shp' # ポリゴンデータ:大阪府(2026年版)
+#DISTRICT_PATH = 'data/nlftp/N03-20260101_18_GML/N03-20260101_18.shp' # ポリゴンデータ:福井県(2026年版)
 
 # データを読込
-gdf_district = gpd.read_file(DISTRICT_PATH, encoding='shift-jis')
+gdf_district = gpd.read_file(DISTRICT_PATH, encoding='UTF-8') # (2026年版の場合)
 
 # 行政区域データを取得
-gdf_district = gdf_district[['N03_003', 'N03_004', 'N03_007', 'geometry']].copy()
+gdf_district = gdf_district[['N03_004', 'N03_005', 'N03_007', 'geometry']]
 gdf_district.columns = ['city1', 'city2', 'd_code', 'geometry']
 
 # データを整形
@@ -71,21 +72,13 @@ gdf_target = gdf_target.reindex(
 ) # (確認用)
 
 
+# %%
+
 # 地域を指定
 city_name = '大阪市'
 
 # データを抽出 
 gdf_target = gdf_target[gdf_target['city1'] == city_name]
-
-# データを整形
-gdf_target['city2'] = gdf_target.apply(
-    lambda row: (
-        row['city2'].replace(row['city1'], '')
-        if pd.notna(row['city1'])
-        else row['city2']
-    ),
-    axis=1
-) # (ラベルが重なる対策用)
 print(gdf_district)
 
 
@@ -181,8 +174,8 @@ def update(frame_i):
         if i != n:
             adj_idx = adj_idx[adj_idx > i] # 重複を除去
         for j in adj_idx:
-            Q_x, Q_y = gdf_target.iloc[i]['centroids'].coords[0] # 対象区域の座標
-            P_x, P_y = gdf_target.iloc[j]['centroids'].coords[0] # 隣接区域の座標
+            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+            P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
             ax.plot(
                 [Q_x, P_x], 
                 [Q_y, P_y], 
@@ -249,7 +242,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'weight_mat_i.mp4', 
+    filename=dir_path+'adfacency_mat_i.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -316,10 +309,10 @@ def update(frame_i):
     for type_idx in range(2):
 
         # 隣接関係を格納
-        gdf_target['adjacency'] = adj_mat[n]
+        gdf_target['adjacency'] = adj_mat_lt[type_idx][n]
 
         # 隣接数を取得
-        k = adj_obj.cardinalities[n]
+        k = adj_obj_lt[type_idx].cardinalities[n]
 
         # ラベルを作成
         type_str   = ['rook', 'queen'][type_idx]
@@ -336,13 +329,17 @@ def update(frame_i):
             ax=ax, column='adjacency', 
             cmap=cmap, vmin=w_min, vmax=w_max
         ) # 隣接関係
+        gdf_target.iloc[[n]].plot(
+            ax=ax, 
+            color='red'
+        ) # 対象区域
         for i in range(N):
             adj_idx, = np.where(adj_mat_lt[type_idx][i] == 1) # 隣接区域のインデックス
             if i != n:
                 adj_idx = adj_idx[adj_idx > i] # 重複を除去
             for j in adj_idx:
-                Q_x, Q_y = gdf_target.iloc[i]['centroids'].coords[0] # 対象区域の座標
-                P_x, P_y = gdf_target.iloc[j]['centroids'].coords[0] # 隣接区域の座標
+                Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+                P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
                 ax.plot(
                     [Q_x, P_x], 
                     [Q_y, P_y], 
@@ -369,7 +366,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'weight_mat_type.mp4', 
+    filename=dir_path+'adfacency_mat_type.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

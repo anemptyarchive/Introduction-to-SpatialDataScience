@@ -1,7 +1,8 @@
 
 # 地理空間データの重み -----------------------------------------------------------
 
-# ch6.2.4
+# book 2
+# ch 6.2.4
 
 # 空間重み行列
 # カーネル法
@@ -22,7 +23,7 @@ print(PROJECT_DIR)
 # 書き出し先を設定
 dir_path  = PROJECT_DIR.as_posix()
 dir_path += '/figure/weights/' # パスを指定
-dir_path += 'spatial_weight_matrix_kernel_method/' # フォルダを指定
+dir_path += 'spatial_weight_matrix_by_kernel/' # フォルダを指定
 print(dir_path)
 
 
@@ -46,13 +47,13 @@ from matplotlib.animation import FuncAnimation
 # データの読込 ------------------------------------------------------------------
 
 # ファイルパスを指定
-DISTRICT_PATH = 'data/nlftp/N03-20230101_27_GML/N03-23_27_230101.shp' # ポリゴンデータ:大阪府
+DISTRICT_PATH = 'data/nlftp/N03-20260101_27_GML/N03-20260101_27.shp' # ポリゴンデータ:大阪府(2026年版)
 
 # データを読込
-gdf_district = gpd.read_file(DISTRICT_PATH, encoding='shift-jis')
+gdf_district = gpd.read_file(DISTRICT_PATH, encoding='UTF-8') # (2026年版の場合)
 
 # 行政区域データを取得
-gdf_district = gdf_district[['N03_003', 'N03_004', 'N03_007', 'geometry']].copy()
+gdf_district = gdf_district[['N03_004', 'N03_005', 'N03_007', 'geometry']]
 gdf_district.columns = ['city1', 'city2', 'd_code', 'geometry']
 
 # データを整形
@@ -68,22 +69,13 @@ gdf_target = gdf_target.reindex(
     columns=['city1', 'city2', 'd_code', 'geometry', 'centroids']
 ) # (確認用)
 
+# %%
 
 # 地域を指定
 city_name = '大阪市'
 
 # データを抽出 
 gdf_target = gdf_target[gdf_target['city1'] == city_name]
-
-# データを整形
-gdf_target['city2'] = gdf_target.apply(
-    lambda row: (
-        row['city2'].replace(row['city1'], '')
-        if pd.notna(row['city1'])
-        else row['city2']
-    ),
-    axis=1
-) # (ラベルが重なる対策用)
 print(gdf_district)
 
 
@@ -136,14 +128,14 @@ lat_max += (lat_max - lat_min) * margin_ratio
 u = 5.0
 d_min = 0.0
 d_max = max(
-    [km_per_degree * gdf_target.centroid.distance(gdf_target.centroid.iloc[i]).max() for i in range(N)]
+    [km_per_degree * gdf_target['centroids'].distance(gdf_target.iloc[i]['centroids']).max() for i in range(N)]
 )
 d_max = np.ceil(d_max /u)*u  # u単位で切り上げ
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
 f_z_max = 0.5
 
 
-# 空間重み行列を作図
+# グラフオブジェクトを初期化
 fig, axes = plt.subplots(
     nrows=2, ncols=2, 
     figsize=(16, 12), dpi=100, facecolor='white', 
@@ -177,21 +169,21 @@ def update(frame_i):
     ax2x.cla()
     ax2y.cla()
 
-    ### 重み行列の作成 -----
+    ### パラメータの設定 -----
 
-    # 区域番号を設定
-    area_idx = frame_i
+    # 区域を設定
+    n = frame_i
 
     ### コロプレス図の作図 -----
 
     # 重みを格納
-    gdf_target['weight'] = weight_mat[area_idx]
+    gdf_target['weight'] = weight_mat[n]
 
     # 隣接数を取得
-    k = weight_obj.cardinalities[area_idx]
+    k = weight_obj.cardinalities[n]
 
     # 重心座標を取得
-    O_x, O_y = gdf_target.iloc[area_idx]['centroids'].coords[0] # 経度, 緯度
+    O_x, O_y = gdf_target.iloc[n]['centroids'].coords[0] # 経度, 緯度
 
     # バンド幅の座標を計算
     t_vec = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
@@ -199,7 +191,7 @@ def update(frame_i):
     y_vec = O_y + h_deg * np.sin(t_vec) # 緯度
 
     # ラベルを作成
-    param_lbl = f'$N = {N}, i = {area_idx+1}, k = {k}, h = {h_km:.1f}\ (km)$'
+    param_lbl = f'$N = {N}, i = {n+1}, k = {k}, h = {h_km:.1f}\ (km)$'
 
     # コロプレス図を描画
     ax = axes[0, 0]
@@ -217,27 +209,17 @@ def update(frame_i):
         label='centroids\nrepresentative point'
     ) # 重心座標
     for i in range(N):
-        if area_idx == i:
-            pass # 重複を除去
         adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
-        adj_idx  = adj_idx[adj_idx > i]          # 重複を除去
+        if i != n:
+            adj_idx = adj_idx[adj_idx > i] # 重複を除去
         for j in adj_idx:
-            Q_x, Q_y = gdf_target.iloc[i]['centroids'].coords[0] # 対象区域の座標
-            P_x, P_y = gdf_target.iloc[j]['centroids'].coords[0] # 隣接区域の座標
+            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+            P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
             ax.plot(
                 [Q_x, P_x], 
                 [Q_y, P_y], 
-                color='C0', linewidth=1.0
+                color='C0', linewidth=3.0 if i == n else 1.0
             ) # 対象区域 - 隣接区域
-    i = area_idx
-    adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
-    for j in adj_idx:
-        P_x, P_y = gdf_target.iloc[j]['centroids'].coords[0] # 隣接区域の座標
-        ax.plot(
-            [O_x, P_x], 
-            [O_y, P_y], 
-            color='C0', linewidth=3.0
-        ) # 対象区域 - 隣接区域
     ax.plot(
         x_vec, y_vec, 
         color='black', linewidth=1.5, linestyle='-.'
@@ -260,12 +242,13 @@ def update(frame_i):
     ### ヒートマップの作図 -----
 
     # 枠線の表示位置を設定
-    target_bool_mat = np.tile(True, reps=weight_mat.shape)
-    target_bool_mat[area_idx] = False
-    target_masked_mat = np.ma.masked_array(weight_mat, target_bool_mat) # 対称区域 - 全区域
-    adj_bool_mat = np.tile(True, reps=weight_mat.shape)
-    adj_bool_mat[area_idx, adj_idx] = False
-    adj_masked_mat = np.ma.masked_array(weight_mat, adj_bool_mat) # 対称区域 - 隣接区域
+    target_bool_mat    = np.tile(True, reps=weight_mat.shape)
+    target_bool_mat[n] = False
+    target_masked_mat  = np.ma.masked_array(weight_mat, target_bool_mat) # 対象区域 - 全区域
+    adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
+    adj_bool_mat             = np.tile(True, reps=weight_mat.shape)
+    adj_bool_mat[n, adj_idx] = False
+    adj_masked_mat           = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[0, 1]
@@ -277,15 +260,15 @@ def update(frame_i):
     ax.pcolor(
         target_masked_mat, 
         facecolor='none', edgecolor='C0', linewidth=1.0, linestyle='dotted'
-    ) # 対称区域 - 全区域
+    ) # 対象区域 - 全区域
     ax.pcolor(
         adj_masked_mat, 
         facecolor='none', edgecolor='C0', linewidth=1.0, linestyle='solid'
-    ) # 対称区域 - 隣接区域
+    ) # 対象区域 - 隣接区域
     for j in range(N):
         ax.text(
-            x=j+0.5, y=area_idx+0.5, 
-            s=f'{weight_mat[area_idx, j]:.2f}', ha='center', va='center', 
+            x=j+0.5, y=n+0.5, 
+            s=f'{weight_mat[n, j]:.2f}', ha='center', va='center', 
             size=6
         ) # 重み
     ax.set_xticks(ticks=np.arange(N)+0.5)
@@ -301,7 +284,7 @@ def update(frame_i):
     ### カーネル関数の作図：距離 -----
 
     # 距離を計算
-    gdf_target['distance'] = gdf_target.centroid.distance(gdf_target.centroid.iloc[area_idx])
+    gdf_target['distance'] = gdf_target['centroids'].distance(gdf_target.iloc[n]['centroids'])
 
     # 距離を取得
     d_vals   = km_per_degree * gdf_target['distance'].to_numpy()
@@ -463,7 +446,7 @@ N = len(gdf_target)
 area_idx = 22
 
 # 距離を計算
-gdf_target['distance'] = gdf_target.centroid.distance(gdf_target.centroid.iloc[area_idx])
+gdf_target['distance'] = gdf_target['centroids'].distance(gdf_target.iloc[area_idx]['centroids'])
 
 
 # %%
@@ -491,7 +474,7 @@ w_min, w_max = 0.0, 1.0 # 最小値・最大値
 f_z_max = 0.5
 
 
-# 空間重み行列を作図
+# グラフオブジェクトを初期化
 fig, axes = plt.subplots(
     nrows=2, ncols=2, 
     figsize=(16, 12), dpi=100, facecolor='white', 
@@ -572,10 +555,9 @@ def update(frame_i):
         color='black', markersize=50, 
         label='centroids\nrepresentative point'
     ) # 重心座標
-    i = area_idx
-    adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
+    adj_idx, = np.where(weight_mat[area_idx] > 0.0) # 隣接区域のインデックス
     for j in adj_idx:
-        P_x, P_y = gdf_target.iloc[j]['centroids'].coords[0] # 隣接区域の座標
+        P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
         ax.plot(
             [O_x, P_x], 
             [O_y, P_y], 
@@ -605,10 +587,10 @@ def update(frame_i):
     # 枠線の表示位置を設定
     target_bool_mat = np.tile(True, reps=weight_mat.shape)
     target_bool_mat[area_idx] = False
-    target_masked_mat = np.ma.masked_array(weight_mat, target_bool_mat) # 対称区域 - 全区域
+    target_masked_mat = np.ma.masked_array(weight_mat, target_bool_mat) # 対象区域 - 全区域
     adj_bool_mat = np.tile(True, reps=weight_mat.shape)
     adj_bool_mat[area_idx, adj_idx] = False
-    adj_masked_mat = np.ma.masked_array(weight_mat, adj_bool_mat) # 対称区域 - 隣接区域
+    adj_masked_mat = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[0, 1]
@@ -620,11 +602,11 @@ def update(frame_i):
     ax.pcolor(
         target_masked_mat, 
         facecolor='none', edgecolor='C0', linewidth=1.0, linestyle='dotted'
-    ) # 対称区域 - 全区域
+    ) # 対象区域 - 全区域
     ax.pcolor(
         adj_masked_mat, 
         facecolor='none', edgecolor='C0', linewidth=1.0, linestyle='solid'
-    ) # 対称区域 - 隣接区域
+    ) # 対象区域 - 隣接区域
     for j in range(N):
         ax.text(
             x=j+0.5, y=area_idx+0.5, 
@@ -816,7 +798,7 @@ k_min, k_max = 0.0, N
 k_max = np.ceil(k_max /u)*u  # u単位で切り上げ
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
 
-# 空間重み行列を作図
+# グラフオブジェクトを初期化
 fig, axes = plt.subplots(
     nrows=1, ncols=2, 
     figsize=(16, 6), dpi=100, facecolor='white', 
@@ -829,7 +811,7 @@ ax = axes[0]
 gdf_target['cardinality'] = 0.0
 gdf_target.plot(
     ax=ax, column='cardinality', 
-    cmap='viridis', vmin=k_min, vmax=k_max, 
+    cmap='viridis', alpha=0.5, vmin=k_min, vmax=k_max, 
     legend=True, legend_kwds={'label': '$k$', 'shrink': 1.0}
 ) # 隣接数軸
 ax = axes[1]
@@ -883,7 +865,7 @@ def update(frame_i):
     ) # 行政区界
     gdf_target.plot(
         ax=ax, column='cardinality', 
-        cmap='viridis', alpha=0.5, vmin=0.0, vmax=N
+        cmap='viridis', alpha=0.5, vmin=k_min, vmax=k_max
     ) # 隣接数
     gdf_target['centroids'].plot(
         ax=ax, 
@@ -894,8 +876,8 @@ def update(frame_i):
         adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
         adj_idx  = adj_idx[adj_idx > i]          # 重複を除去
         for j in adj_idx:
-            O_x, O_y = gdf_target.iloc[i]['centroids'].coords[0] # 対象区域の座標
-            P_x, P_y = gdf_target.iloc[j]['centroids'].coords[0] # 隣接区域の座標
+            O_x, O_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+            P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
             ax.plot(
                 [O_x, P_x], 
                 [O_y, P_y], 
@@ -951,9 +933,4 @@ anim.save(
 
 # %%
 
-print(gdf_target.iloc[0]['centroids'].y)
 
-# %%
-
-
-# %%
