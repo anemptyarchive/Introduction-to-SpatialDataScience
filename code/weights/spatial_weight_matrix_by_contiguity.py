@@ -36,7 +36,7 @@ import geopandas as gpd
 from pysal.lib import weights
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+from matplotlib.colors import LinearSegmentedColormap
 import japanize_matplotlib
 from matplotlib.animation import FuncAnimation
 
@@ -61,13 +61,12 @@ gdf_district = gdf_district.to_crs(epsg=dst_proj) # 空間座標系を再設定
 
 # データを統合
 gdf_target = gdf_district.dissolve(by=['d_code'], as_index=False) # 飛び地を統合
-gdf_target['centers'] = gdf_target['geometry'].centroid # 重心座標
+gdf_target['centroids'] = gdf_target['geometry'].centroid # 重心座標
 
 # データフレームを整形
 gdf_target = gdf_target.reindex(
-    columns=['city1', 'city2', 'd_code', 'geometry', 'centers']
+    columns=['city1', 'city2', 'd_code', 'geometry', 'centroids']
 ) # (確認用)
-gdf_target['city2_label'] = gdf_target['city2'].str.replace('大阪市|堺市', '', regex=True) # 地名が重なる対策用
 
 
 # %%
@@ -82,161 +81,173 @@ print(gdf_district)
 
 # %%
 
-# 隣接関係を作成
-wr = weights.Rook.from_dataframe(gdf_target)
-
-# 空間隣接行列を作成
-adj_mat = wr.full()[0].astype(int)
-
-# 空間重み行列を作成
-weight_mat = adj_mat / adj_mat.sum(axis=1, keepdims=True)
-np.nan_to_num(weight_mat, nan=0.0) # 列要素が全て0の場合用
-
-
-# %%
+### パラメータの設定 -----
 
 # 区域数を取得
 N = len(gdf_target)
 
-# 色の調整用:(固定)
-w_max = 1.0
+# フレーム数を設定
+frame_num = N
 
-# 隣接区域以外を非表示化
-weight_mat_masked = np.ma.masked_where(adj_mat==0, weight_mat)
+
+# 空間隣接行列を作成
+adj_obj = weights.Rook.from_dataframe(df=gdf_target)  # ルーク型
+#adj_obj = weights.Queen.from_dataframe(df=gdf_target) # クイーン型
+adj_obj.transform = 'r' # 正規化
+weight_mat, _ = adj_obj.full()
+
+
+# %%
+
+### 作図 -----
+
+# カラーマップを作成
+cmap = LinearSegmentedColormap.from_list(
+    name='white_red',
+    colors=['white', 'red']
+)
+
+# 軸の範囲を設定
+w_min, w_max = 0.0, 1.0 # 最小値・最大値
+
 
 # グラフオブジェクトを初期化
-fig, axes = plt.subplots(nrows=1, ncols=2, constrained_layout=True, 
-                         figsize=(20, 10), width_ratios=[1, 1], dpi=100, facecolor='white')
-fig.suptitle('spatial weight matrix', fontsize=20)
+fig, axes = plt.subplots(
+    nrows=1, ncols=2, 
+    figsize=(15, 6), dpi=100, facecolor='white', 
+    constrained_layout=True
+)
+fig.suptitle('spatial weight matrix: contiguity', fontsize=20)
+
+# 装飾用のダミーを作成
+ax = axes[0]
+dummy_pc = ax.pcolormesh(
+    np.zeros(shape=(N, N)), 
+    cmap=cmap, vmin=w_min, vmax=w_max, 
+    shading='auto'
+) # カラーバーの表示用
+fig.colorbar(
+    mappable=dummy_pc, ax=ax, shrink=1.0, 
+    label='$w$'
+) # 重み軸
+
+
+# 初期化処理を定義
+def init():
+    pass
 
 # 作図処理を定義
-def update(n):
+def update(frame_i):
     
     # 前フレームのグラフを初期化
     [ax.cla() for ax in axes]
 
+    ### パラメータの設定 -----
+
+    # 区域を設定
+    n = frame_i
+
+    ### コロプレス図の作図 -----
+
     # 重みを格納
-    gdf_target['weight'] = weight_mat[:, n]
+    gdf_target['weight'] = weight_mat[n]
     
-    # 隣接ネットワークを作図
+    # 隣接数を取得
+    k = adj_obj.cardinalities[n]
+
+    # ラベルを作成
+    param_lbl = f'$N = {N}, i = {n+1}, k = {k}$'
+
+    # コロプレス図を描画
     ax = axes[0]
-    gdf_district.boundary.plot(ax=ax, linewidth=0.5, edgecolor='black') # 行政区界
-    gdf_target.plot(ax=ax, column='weight', cmap='seismic', vmin=-w_max, vmax=w_max) # 各区域の値
-    for j in range(N):
-        # 隣接区域のインデックスを抽出
-        adj_idx, = np.where(adj_mat[:, j] == 1)
-        adj_idx = adj_idx[adj_idx > j] # 重複を除去
-        for i in adj_idx:
-            ax.plot([gdf_target.centers.x[j], gdf_target.centers.x[i]], 
-                    [gdf_target.centers.y[j], gdf_target.centers.y[i]], 
-                    color='C0', linewidth=1.0) # 各区域-隣接区域
-    # 隣接区域のインデックスを抽出
-    adj_idx, = np.where(adj_mat[:, n] == 1)
-    for i in adj_idx:
-        ax.plot([gdf_target.centers.x[n], gdf_target.centers.x[i]], 
-                [gdf_target.centers.y[n], gdf_target.centers.y[i]], 
-                color='orange', linewidth=2.5) # 対象区域-隣接区域
-    for x, y, label in zip(gdf_target.centers.x, gdf_target.centers.y, gdf_target.city2_label):
-        ax.annotate(text=label, xy=(x-0.015, y-0.005), size=9) # 区域名
+    gdf_target.boundary.plot(
+        ax=ax, 
+        edgecolor='black', linewidth=0.5
+    ) # 行政区界
+    gdf_target.plot(
+        ax=ax, column='weight', 
+        cmap=cmap, vmin=w_min, vmax=w_max
+    ) # 重み
+    for i in range(N):
+        adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
+        if i != n:
+            adj_idx = adj_idx[adj_idx > i] # 重複を除去
+        for j in adj_idx:
+            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 各区域の座標
+            P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
+            ax.plot(
+                [Q_x, P_x], 
+                [Q_y, P_y], 
+                color='orange' if i == n else 'C0', 
+                linewidth=3.0 if i == n else 1.0
+            ) # 各区域 - 隣接区域
+    for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
+        ax.text(
+            x=x, y=y, 
+            s=area_lbl, ha='right', va='bottom', 
+            size=10
+        ) # 区域名
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
-    ax.set_title(f'Osaka: $N = {N}$', loc='left')
+    ax.set_title(param_lbl, loc='left')
     ax.grid()
-    ax.set_aspect('equal', adjustable='box')
+    ax.set_aspect(aspect='equal', adjustable='box')
     
-    # 対象区域以外・隣接区域以外を非表示化
-    target_mat_bool = np.tile(True, reps=adj_mat.shape)
-    target_mat_bool[:, n] = False
-    target_mat_masked = np.ma.masked_array(weight_mat_masked, target_mat_bool)
-    
-    # 空間重み行列を作図
+    ### ヒートマップの作図 -----
+
+    # 枠線の表示位置を設定
+    target_bool_mat    = np.tile(True, reps=weight_mat.shape)
+    target_bool_mat[n] = False
+    target_masked_mat  = np.ma.masked_array(weight_mat, target_bool_mat) # 対象区域 - 全区域
+    adj_idx, = np.where(weight_mat[n] > 0.0) # 隣接区域のインデックス
+    adj_bool_mat             = np.tile(True, reps=weight_mat.shape)
+    adj_bool_mat[n, adj_idx] = False
+    adj_masked_mat           = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
+
+    # ヒートマップを描画
     ax = axes[1]
-    ax.pcolor(weight_mat, cmap='seismic', vmin=-w_max, vmax=w_max) # 全区域
-    ax.pcolor(target_mat_masked, cmap='seismic', vmin=-w_max, vmax=w_max, color='gray') # 対象区域の隣接区域
-    ax.vlines(x=n+0.5, ymin=0, ymax=N, color='gray', linestyle='dashed') # 対象区域
-    ax.set_xticks(ticks=np.arange(N)+0.5)
-    ax.set_xticklabels(labels=gdf_target.city2, size=9, rotation=90)
-    ax.set_yticks(ticks=np.arange(N)+0.5)
-    ax.set_yticklabels(labels=gdf_target.city2, size=9)
-    ax.invert_yaxis() # 軸の反転
-    ax.set_xlabel('city ( $j$ )')
-    ax.set_ylabel('city ( $i$ )')
-    ax.set_title(f'{gdf_target.city2[n]}: $\\sum_{{i=1}}^N \\tilde{{w}}_{{ij}} = {np.sum(adj_mat[:, n])}$', loc='left') # 対象区域の隣接数
-    plt.grid()
-    ax.set_aspect('equal', adjustable='box')
-
-# 動画を作成
-ani = FuncAnimation(fig=fig, func=update, frames=N, interval=1000)
-
-# 動画を書出
-ani.save(
-    filename=dir_path+'weight_mat_i.mp4', 
-    progress_callback = lambda i, n: print(f'frame: {i} / {n}')
-)
-
-
-# %%
-
-# 隣接区域数を格納
-gdf_target['count'] = np.sum(adj_mat, axis=1)
-
-# 区域数を取得
-N = len(gdf_target)
-
-# 色の調整用
-cnt_min, cnt_max = 0.0, gdf_target['count'].max()
-
-# 隣接区域以外を非表示化
-weight_mat_masked = np.ma.masked_where(adj_mat==0, weight_mat)
-
-# グラフオブジェクトを初期化
-fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, 
-                       figsize=(10, 10), dpi=100, facecolor='white')
-fig.suptitle('spatial weight matrix', fontsize=20)
-gdf_target.plot(ax=ax, column='count', cmap='jet', vmin=cnt_min, vmax=cnt_max, 
-                legend=True, legend_kwds={'label': 'count'}) # カラーバー表示用のダミー
-
-# 作図処理を定義
-def update(n):
-    
-    # 前フレームのグラフを初期化
-    ax.cla()
-    
-    # 隣接ネットワークを作図
-    gdf_district.boundary.plot(ax=ax, linewidth=0.5, edgecolor='white') # 行政区界
-    gdf_target.plot(ax=ax, column='count', cmap='jet', vmin=cnt_min, vmax=cnt_max) # 隣接数
-    for i in np.where(adj_mat[:, n] == 1)[0]:
-        ax.plot([gdf_target.centers.x[n], gdf_target.centers.x[i]], 
-                [gdf_target.centers.y[n], gdf_target.centers.y[i]], 
-                color='white', linewidth=6.0) # 白抜き
+    ax.pcolormesh(
+        weight_mat, 
+        cmap=cmap, vmin=w_min, vmax=w_max, 
+        shading='auto'
+    ) # 全区域 - 全区域
+    ax.pcolor(
+        target_masked_mat, 
+        facecolor='none', edgecolor='C0', linewidth=1.0, linestyle='dotted'
+    ) # 対象区域 - 全区域
+    ax.pcolor(
+        adj_masked_mat, 
+        facecolor='none', edgecolor='orange', linewidth=1.0, linestyle='solid'
+    ) # 対象区域 - 隣接区域
     for j in range(N):
-        # 隣接区域のインデックスを抽出
-        adj_idx, = np.where(adj_mat[:, j] == 1)
-        adj_idx = adj_idx[adj_idx > j] # 重複を除去
-        for i in adj_idx:
-            ax.plot([gdf_target.centers.x[j], gdf_target.centers.x[i]], 
-                    [gdf_target.centers.y[j], gdf_target.centers.y[i]], 
-                    color='C0', linewidth=1.0) # 各区域-隣接区域
-    for i in np.where(adj_mat[:, n] == 1)[0]:
-        ax.plot([gdf_target.centers.x[n], gdf_target.centers.x[i]], 
-                [gdf_target.centers.y[n], gdf_target.centers.y[i]], 
-                color=cm.seismic(weight_mat[i, n]*0.5+0.5), linewidth=2.5) # 対象区域-隣接区域
-    for x, y, label in zip(gdf_target.centers.x, gdf_target.centers.y, gdf_target.city2_label):
-        ax.annotate(text=label, xy=(x-0.015, y-0.005), size=9) # 区域名
-    ax.set_xlabel('longitude')
-    ax.set_ylabel('latitude')
-    ax.set_title(f'Osaka: $N = {N}$', loc='left')
+        ax.text(
+            x=j+0.5, y=n+0.5, 
+            s=f'{weight_mat[n, j]:.2f}', ha='center', va='center', 
+            size=6
+        ) # 重み
+    ax.set_xticks(ticks=np.arange(N)+0.5)
+    ax.set_xticklabels(labels=gdf_target['city2'], size=10, rotation=90) # 区域名
+    ax.set_yticks(ticks=np.arange(N)+0.5)
+    ax.set_yticklabels(labels=gdf_target['city2'], size=10) # 区域名
+    ax.set_xlabel('$j$')
+    ax.set_ylabel('$i$')
     ax.grid()
-    ax.set_aspect('equal', adjustable='box')
+    ax.invert_yaxis() # (行番号との対応用)
+    ax.set_aspect(aspect='equal', adjustable='box')
 
 # 動画を作成
-ani = FuncAnimation(fig=fig, func=update, frames=N, interval=1000)
+anim = FuncAnimation(
+    fig=fig, func=update, init_func=init, 
+    frames=frame_num, interval=1000
+)
 
 # 動画を書出
-ani.save(
-    filename=dir_path+'weight_mat_i_net.mp4', 
-    progress_callback = lambda i, n: print(f'frame: {i} / {n}')
+anim.save(
+    filename=dir_path+'weight_mat_i.mp4', 
+    progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
 
 # %%
+
+
