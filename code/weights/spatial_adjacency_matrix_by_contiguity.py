@@ -33,7 +33,6 @@ print(dir_path)
 
 # ライブラリを読込
 import geopandas as gpd
-import pandas as pd
 from pysal.lib import weights
 import numpy as np
 import matplotlib.pyplot as plt
@@ -174,13 +173,13 @@ def update(frame_i):
         if i != n:
             adj_idx = adj_idx[adj_idx > i] # 重複を除去
         for j in adj_idx:
-            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 各区域の座標
             P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
             ax.plot(
                 [Q_x, P_x], 
                 [Q_y, P_y], 
                 color='C0', linewidth=3.0 if i == n else 1.0
-            ) # 対象区域 - 隣接区域
+            ) # 各区域 - 隣接区域
     # 隣接区域のインデックスを抽出
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
@@ -200,7 +199,7 @@ def update(frame_i):
     target_bool_mat    = np.tile(True, reps=adj_mat.shape)
     target_bool_mat[n] = False
     target_masked_mat  = np.ma.masked_array(adj_mat, target_bool_mat) # 対象区域 - 全区域
-    adj_idx, = np.where(adj_mat[i] == 1) # 隣接区域のインデックス
+    adj_idx, = np.where(adj_mat[n] == 1) # 隣接区域のインデックス
     adj_bool_mat             = np.tile(True, reps=adj_mat.shape)
     adj_bool_mat[n, adj_idx] = False
     adj_masked_mat           = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
@@ -289,6 +288,7 @@ fig, axes = plt.subplots(
 )
 fig.suptitle('spatial adjacency matrix: contiguity', fontsize=20)
 
+
 # 初期化処理を定義
 def init():
     pass
@@ -338,13 +338,13 @@ def update(frame_i):
             if i != n:
                 adj_idx = adj_idx[adj_idx > i] # 重複を除去
             for j in adj_idx:
-                Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+                Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 各区域の座標
                 P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
                 ax.plot(
                     [Q_x, P_x], 
                     [Q_y, P_y], 
                     color='C0', linewidth=3.0 if i == n else 1.0
-                ) # 対象区域 - 隣接区域
+                ) # 各区域 - 隣接区域
         # 隣接区域のインデックスを抽出
         for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
             ax.text(
