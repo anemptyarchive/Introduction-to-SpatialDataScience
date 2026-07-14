@@ -238,7 +238,8 @@ def update(frame_i):
                 ) # 隣接関係の向き:(ベクトルの書き分け用)
     ax.plot(
         x_vec, y_vec, 
-        color='black', linewidth=1.5, linestyle='-.'
+        color='black', linewidth=1.5, linestyle='-.', 
+        label='bandwidth'
     ) # バンド幅
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
@@ -249,6 +250,7 @@ def update(frame_i):
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
     ax.set_title(param_lbl, loc='left')
+    ax.legend(loc='upper right')
     ax.grid()
     ax.set_xlim(xmin=lon_min, xmax=lon_max)
     ax.set_ylim(ymin=lat_min, ymax=lat_max)
@@ -447,7 +449,8 @@ def update(frame_i):
             ) # 隣接関係の向き:(ベクトルの書き分け用)
     ax.plot(
         x_vec, y_vec, 
-        color='black', linewidth=1.5, linestyle='-.'
+        color='black', linewidth=1.5, linestyle='-.', 
+        label='bandwidth'
     ) # バンド幅
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
@@ -458,6 +461,7 @@ def update(frame_i):
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
     ax.set_title(param_lbl, loc='left')
+    ax.legend(loc='upper right')
     ax.grid()
     ax.set_xlim(xmin=lon_min, xmax=lon_max)
     ax.set_ylim(ymin=lat_min, ymax=lat_max)

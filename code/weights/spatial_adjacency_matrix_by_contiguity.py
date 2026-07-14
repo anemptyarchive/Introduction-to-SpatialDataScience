@@ -246,7 +246,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'adfacency_mat_i.mp4', 
+    filename=dir_path+'adjacency_mat_i.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -367,7 +367,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'adfacency_mat_type.mp4', 
+    filename=dir_path+'adjacency_mat_type.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

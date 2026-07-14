@@ -228,7 +228,8 @@ def update(frame_i):
                 ) # 隣接関係の向き:(ベクトルの書き分け用)
     ax.plot(
         x_vec, y_vec, 
-        color='black', linewidth=1.5, linestyle='-.'
+        color='black', linewidth=1.5, linestyle='-.', 
+        label='bandwidth'
     ) # バンド幅
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
@@ -239,6 +240,7 @@ def update(frame_i):
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
     ax.set_title(param_lbl, loc='left')
+    ax.legend(loc='upper left')
     ax.grid()
     ax.set_xlim(xmin=lon_min, xmax=lon_max)
     ax.set_ylim(ymin=lat_min, ymax=lat_max)
@@ -292,7 +294,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'adfacency_mat_i.mp4', 
+    filename=dir_path+'adjacency_mat_i.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -435,7 +437,8 @@ def update(frame_i):
             ) # 隣接関係の向き:(ベクトルの書き分け用)
     ax.plot(
         x_vec, y_vec, 
-        color='black', linewidth=1.5, linestyle='-.'
+        color='black', linewidth=1.5, linestyle='-.', 
+        label='bandwidth'
     ) # バンド幅
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
@@ -446,6 +449,7 @@ def update(frame_i):
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
     ax.set_title(param_lbl, loc='left')
+    ax.legend(loc='upper right')
     ax.grid()
     ax.set_xlim(xmin=lon_min, xmax=lon_max)
     ax.set_ylim(ymin=lat_min, ymax=lat_max)
@@ -499,7 +503,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'adfacency_mat_k_one.mp4', 
+    filename=dir_path+'adjacency_mat_k_one.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 
@@ -676,7 +680,7 @@ anim = FuncAnimation(
 
 # 動画を書出
 anim.save(
-    filename=dir_path+'adfacency_mat_k_all.mp4', 
+    filename=dir_path+'adjacency_mat_k_all.mp4', 
     progress_callback=lambda i, n: print(f'\rframe: {i+1} / {n}', end='', flush=True)
 )
 

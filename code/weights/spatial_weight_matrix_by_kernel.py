@@ -227,7 +227,8 @@ def update(frame_i):
             ) # 各区域 - 隣接区域
     ax.plot(
         x_vec, y_vec, 
-        color='black', linewidth=1.5, linestyle='-.'
+        color='black', linewidth=1.5, linestyle='-.', 
+        label='bandwidth'
     ) # バンド幅
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
@@ -565,7 +566,8 @@ def update(frame_i):
         ) # 対象区域 - 隣接区域
     ax.plot(
         x_vec, y_vec, 
-        color='black', linewidth=1.5, linestyle='-.'
+        color='black', linewidth=1.5, linestyle='-.', 
+        label='bandwidth'
     ) # バンド幅
     for x, y, area_lbl in zip(gdf_target['centroids'].x, gdf_target['centroids'].y, gdf_target['city2']):
         ax.text(
