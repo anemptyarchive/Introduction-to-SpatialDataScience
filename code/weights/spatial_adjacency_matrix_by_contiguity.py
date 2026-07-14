@@ -83,7 +83,15 @@ print(gdf_district)
 
 # %%
 
-# 区域の影響 ----------------------------------------------------------
+# 共通の設定 --------------------------------------------------------------------
+
+# カラーマップを作成
+cmap = ListedColormap(colors=['white', 'orange'])
+
+
+# %%
+
+# 区域の影響 --------------------------------------------------------------------
 
 ### パラメータの設定 -----
 
@@ -95,8 +103,8 @@ frame_num = N
 
 
 # 空間隣接行列を作成
-adj_obj = weights.Rook.from_dataframe(df=gdf_target)  # ルーク型
-#adj_obj = weights.Queen.from_dataframe(df=gdf_target) # クイーン型
+adj_obj = weights.Rook.from_dataframe(df=gdf_target, geom_col='geometry')  # ルーク型
+#adj_obj = weights.Queen.from_dataframe(df=gdf_target, geom_col='geometry') # クイーン型
 adj_mat, _ = adj_obj.full()
 adj_mat = adj_mat.astype(dtype=np.int8)
 
@@ -104,9 +112,6 @@ adj_mat = adj_mat.astype(dtype=np.int8)
 # %%
 
 ### 作図 -----
-
-# カラーマップを作成
-cmap = ListedColormap(colors=['white', 'orange'])
 
 # 軸の範囲を設定
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
@@ -200,9 +205,9 @@ def update(frame_i):
     target_bool_mat[n] = False
     target_masked_mat  = np.ma.masked_array(adj_mat, target_bool_mat) # 対象区域 - 全区域
     adj_idx, = np.where(adj_mat[n] == 1) # 隣接区域のインデックス
-    adj_bool_mat             = np.tile(True, reps=adj_mat.shape)
+    adj_bool_mat       = np.tile(True, reps=adj_mat.shape)
     adj_bool_mat[n, adj_idx] = False
-    adj_masked_mat           = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
+    adj_masked_mat     = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[1]
@@ -273,9 +278,6 @@ adj_mat_lt = [
 
 ### 作図 -----
 
-# カラーマップを作成
-cmap = ListedColormap(colors=['white', 'orange'])
-
 # 軸の範囲を設定
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
 
@@ -287,7 +289,6 @@ fig, axes = plt.subplots(
     constrained_layout=True
 )
 fig.suptitle('spatial adjacency matrix: contiguity', fontsize=20)
-
 
 # 初期化処理を定義
 def init():

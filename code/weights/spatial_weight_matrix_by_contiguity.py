@@ -6,7 +6,7 @@
 
 # 空間重み行列
 # 境界の共有
-# 隣接関係の可視化
+# 重みの可視化
 
 
 # %%
@@ -81,6 +81,19 @@ print(gdf_district)
 
 # %%
 
+# 共通の設定 --------------------------------------------------------------------
+
+# カラーマップを作成
+cmap = LinearSegmentedColormap.from_list(
+    name='white_red',
+    colors=['white', 'red']
+)
+
+
+# %%
+
+# 区域の影響 --------------------------------------------------------------------
+
 ### パラメータの設定 -----
 
 # 区域数を取得
@@ -91,21 +104,15 @@ frame_num = N
 
 
 # 空間隣接行列を作成
-adj_obj = weights.Rook.from_dataframe(df=gdf_target)  # ルーク型
-#adj_obj = weights.Queen.from_dataframe(df=gdf_target) # クイーン型
-adj_obj.transform = 'r' # 正規化
+adj_obj = weights.Rook.from_dataframe(df=gdf_target, geom_col='geometry')  # ルーク型
+#adj_obj = weights.Queen.from_dataframe(df=gdf_target, geom_col='geometry') # クイーン型
+adj_obj.transform = 'R' # 正規化
 weight_mat, _ = adj_obj.full()
 
 
 # %%
 
 ### 作図 -----
-
-# カラーマップを作成
-cmap = LinearSegmentedColormap.from_list(
-    name='white_red',
-    colors=['white', 'red']
-)
 
 # 軸の範囲を設定
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
@@ -120,7 +127,7 @@ fig, axes = plt.subplots(
 fig.suptitle('spatial weight matrix: contiguity', fontsize=20)
 
 # 装飾用のダミーを作成
-ax = axes[0]
+ax = axes[1]
 dummy_pc = ax.pcolormesh(
     np.zeros(shape=(N, N)), 
     cmap=cmap, vmin=w_min, vmax=w_max, 
@@ -130,7 +137,6 @@ fig.colorbar(
     mappable=dummy_pc, ax=ax, shrink=1.0, 
     label='$w$'
 ) # 重み軸
-
 
 # 初期化処理を定義
 def init():
@@ -200,9 +206,9 @@ def update(frame_i):
     target_bool_mat[n] = False
     target_masked_mat  = np.ma.masked_array(weight_mat, target_bool_mat) # 対象区域 - 全区域
     adj_idx, = np.where(weight_mat[n] > 0.0) # 隣接区域のインデックス
-    adj_bool_mat             = np.tile(True, reps=weight_mat.shape)
+    adj_bool_mat       = np.tile(True, reps=weight_mat.shape)
     adj_bool_mat[n, adj_idx] = False
-    adj_masked_mat           = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
+    adj_masked_mat     = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[1]

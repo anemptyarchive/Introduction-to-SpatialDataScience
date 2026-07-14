@@ -251,9 +251,9 @@ def update(frame_i):
     target_bool_mat[n] = False
     target_masked_mat  = np.ma.masked_array(adj_mat, target_bool_mat) # 対象区域 - 全区域
     adj_idx, = np.where(adj_mat[n] == 1) # 隣接区域のインデックス
-    adj_bool_mat             = np.tile(True, reps=adj_mat.shape)
+    adj_bool_mat       = np.tile(True, reps=adj_mat.shape)
     adj_bool_mat[n, adj_idx] = False
-    adj_masked_mat           = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
+    adj_masked_mat     = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[1]
@@ -303,15 +303,15 @@ anim.save(
 
 ### パラメータの設定 -----
 
+# 区域数を取得
+N = len(gdf_target)
+
 # 近傍数の最大値を指定
-max_K = 23
+max_K = N - 1
 
 # フレーム数を設定
 frame_num = max_K
 
-
-# 区域数を取得
-N = len(gdf_target)
 
 # 区域を指定
 area_idx = 22
@@ -454,13 +454,13 @@ def update(frame_i):
     ### ヒートマップの作図 -----
 
     # 枠線の表示位置を設定
-    target_bool_mat    = np.tile(True, reps=adj_mat.shape)
+    target_bool_mat   = np.tile(True, reps=adj_mat.shape)
     target_bool_mat[area_idx] = False
-    target_masked_mat  = np.ma.masked_array(adj_mat, target_bool_mat) # 対象区域 - 全区域
+    target_masked_mat = np.ma.masked_array(adj_mat, target_bool_mat) # 対象区域 - 全区域
     adj_idx, = np.where(adj_mat[area_idx] == 1) # 隣接区域のインデックス
-    adj_bool_mat             = np.tile(True, reps=adj_mat.shape)
+    adj_bool_mat      = np.tile(True, reps=adj_mat.shape)
     adj_bool_mat[area_idx, adj_idx] = False
-    adj_masked_mat           = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
+    adj_masked_mat    = np.ma.masked_array(adj_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[1]
@@ -510,15 +510,14 @@ anim.save(
 
 ### パラメータの設定 -----
 
+# 区域数を取得
+N = len(gdf_target)
+
 # 近傍数の最大値を指定
-max_K = 23
+max_K = N - 1
 
 # フレーム数を設定
 frame_num = max_K
-
-
-# 区域数を取得
-N = len(gdf_target)
 
 
 # %%
@@ -586,7 +585,7 @@ def update(frame_i):
     # 隣接数を取得
     gdf_target['cardinality'] = np.array(list(adj_obj.cardinalities.values()))
 
-    # バンド幅を計算
+    # バンド幅を取得
     adj_idx_lt = [np.where(adj_mat[i] == 1)[0] for i in range(N)] # 隣接区域のインデックス
     h_km_vals  = km_per_degree * np.array(
         [gdf_target.loc[adj_idx_lt[i], 'centroids'].distance(gdf_target.loc[i, 'centroids']).max() for i in range(N)]
@@ -603,7 +602,7 @@ def update(frame_i):
     ) # 行政区界
     gdf_target.plot(
         ax=ax, column='cardinality', 
-        cmap=cmap, alpha=0.5, vmin=w_min, vmax=w_max
+        cmap='viridis', alpha=0.5, vmin=k_min, vmax=k_max
     ) # 隣接数
     gdf_target.centroids.plot(
         ax=ax, 

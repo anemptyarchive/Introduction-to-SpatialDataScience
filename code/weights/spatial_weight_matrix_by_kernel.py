@@ -6,7 +6,7 @@
 
 # 空間重み行列
 # カーネル法
-# 隣接関係の可視化
+# 重みの可視化
 
 
 # %%
@@ -33,7 +33,6 @@ print(dir_path)
 
 # ライブラリを読込
 import geopandas as gpd
-import pandas as pd
 from pysal.lib import weights
 import numpy as np
 import matplotlib.pyplot as plt
@@ -81,7 +80,23 @@ print(gdf_district)
 
 # %%
 
-# 区域の影響 ----------------------------------------------------------
+# 共通の設定 --------------------------------------------------------------------
+
+# バンド幅の変換係数を作成
+km_per_degree = 111.32
+degree_per_km = 1.0/km_per_degree
+
+
+# カラーマップを作成
+cmap = LinearSegmentedColormap.from_list(
+    name='white_red',
+    colors=['white', 'red']
+)
+
+
+# %%
+
+# 区域の影響 --------------------------------------------------------------------
 
 ### パラメータの設定 -----
 
@@ -91,10 +106,6 @@ N = len(gdf_target)
 # フレーム数を設定
 frame_num = N
 
-
-# バンド幅の変換係数を作成
-km_per_degree = 111.32
-degree_per_km = 1.0/km_per_degree
 
 # バンド幅(km)を指定
 h_km  = 5.0
@@ -112,12 +123,6 @@ weight_mat, _ = weight_obj.full()
 
 ### 作図 -----
 
-# カラーマップを作成
-cmap = LinearSegmentedColormap.from_list(
-    name='white_red',
-    colors=['white', 'red']
-)
-
 # 軸の範囲を設定
 margin_ratio = 0.05
 lon_min, lat_min, lon_max, lat_max = gdf_target.total_bounds
@@ -128,7 +133,7 @@ lat_max += (lat_max - lat_min) * margin_ratio
 u = 5.0
 d_min = 0.0
 d_max = max(
-    [km_per_degree * gdf_target['centroids'].distance(gdf_target.iloc[i]['centroids']).max() for i in range(N)]
+    [km_per_degree * gdf_target['centroids'].distance(gdf_target.loc[i, 'centroids']).max() for i in range(N)]
 )
 d_max = np.ceil(d_max /u)*u  # u単位で切り上げ
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
@@ -183,7 +188,7 @@ def update(frame_i):
     k = weight_obj.cardinalities[n]
 
     # 重心座標を取得
-    O_x, O_y = gdf_target.iloc[n]['centroids'].coords[0] # 経度, 緯度
+    O_x, O_y = gdf_target.loc[n, 'centroids'].coords[0] # 対象区域の座標
 
     # バンド幅の座標を計算
     t_vec = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
@@ -213,13 +218,13 @@ def update(frame_i):
         if i != n:
             adj_idx = adj_idx[adj_idx > i] # 重複を除去
         for j in adj_idx:
-            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 対象区域の座標
+            Q_x, Q_y = gdf_target.loc[i, 'centroids'].coords[0] # 各区域の座標
             P_x, P_y = gdf_target.loc[j, 'centroids'].coords[0] # 隣接区域の座標
             ax.plot(
                 [Q_x, P_x], 
                 [Q_y, P_y], 
                 color='C0', linewidth=3.0 if i == n else 1.0
-            ) # 対象区域 - 隣接区域
+            ) # 各区域 - 隣接区域
     ax.plot(
         x_vec, y_vec, 
         color='black', linewidth=1.5, linestyle='-.'
@@ -246,9 +251,9 @@ def update(frame_i):
     target_bool_mat[n] = False
     target_masked_mat  = np.ma.masked_array(weight_mat, target_bool_mat) # 対象区域 - 全区域
     adj_idx, = np.where(weight_mat[i] > 0.0) # 隣接区域のインデックス
-    adj_bool_mat             = np.tile(True, reps=weight_mat.shape)
+    adj_bool_mat       = np.tile(True, reps=weight_mat.shape)
     adj_bool_mat[n, adj_idx] = False
-    adj_masked_mat           = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
+    adj_masked_mat     = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[0, 1]
@@ -284,7 +289,7 @@ def update(frame_i):
     ### カーネル関数の作図：距離 -----
 
     # 距離を計算
-    gdf_target['distance'] = gdf_target['centroids'].distance(gdf_target.iloc[n]['centroids'])
+    gdf_target['distance'] = gdf_target['centroids'].distance(gdf_target.loc[n, 'centroids'])
 
     # 距離を取得
     d_vals   = km_per_degree * gdf_target['distance'].to_numpy()
@@ -296,6 +301,11 @@ def update(frame_i):
 
     # 関数曲線を描画
     ax = axes[1, 0]
+    ax.hlines(
+        y=f_d_vals[d_vals <= h_km], xmin=0.0, xmax=d_vals[d_vals <= h_km], 
+        color='C0', linewidth=1.0, 
+        zorder=9
+    ) # 距離
     ax.vlines(
         x=d_vals, ymin=w_min, ymax=w_max, 
         colors='black', linewidths=1.0, linestyles=':', 
@@ -403,7 +413,7 @@ def update(frame_i):
     ax.set_ylim(ymin=w_min, ymax=f_z_max)
     ax2y.set_ylim(ymin=w_min, ymax=f_z_max)
     ax.set_xlabel('$z = \\frac{d}{h}$')
-    fnc_lbl = '$w = f(z) = \\frac{1}{\\sqrt{2 \\pi}} \\exp(-\\frac{1}{2} z^2)\ (z < 1)$'
+    fnc_lbl = '$w = f(z) = \\frac{1}{\\sqrt{2 \\pi}} \\exp(-\\frac{1}{2} z^2)\ (z \\leq 1)$'
     ax.set_ylabel(fnc_lbl)
     ax.legend(loc='upper right')
     ax.grid()
@@ -434,10 +444,6 @@ frame_num = 150
 h_km_vals = np.linspace(start=0.0, stop=15.0, num=frame_num+1)[1:] # 0を除外
 print(h_km_vals[:5])
 
-# バンド幅の変換係数を作成
-km_per_degree = 111.32
-degree_per_km = 1.0/km_per_degree
-
 
 # 区域数を取得
 N = len(gdf_target)
@@ -446,18 +452,12 @@ N = len(gdf_target)
 area_idx = 22
 
 # 距離を計算
-gdf_target['distance'] = gdf_target['centroids'].distance(gdf_target.iloc[area_idx]['centroids'])
+gdf_target['distance'] = gdf_target['centroids'].distance(gdf_target.loc[area_idx, 'centroids'])
 
 
 # %%
 
 ### 作図 -----
-
-# カラーマップを作成
-cmap = LinearSegmentedColormap.from_list(
-    name='white_red',
-    colors=['white', 'red']
-)
 
 # 軸の範囲を設定
 margin_ratio = 0.05
@@ -511,8 +511,8 @@ def update(frame_i):
     ### パラメータの設定 -----
 
     # バンド幅を取得
-    h_km  = h_km_vals[frame_i]   # 度単位の距離
-    h_deg = degree_per_km * h_km # キロメートル単位の距離
+    h_km  = h_km_vals[frame_i]   # キロメートル単位の距離
+    h_deg = degree_per_km * h_km # 度単位の距離
 
     # 空間重み行列を作成
     weight_obj = weights.distance.Kernel.from_dataframe(
@@ -530,7 +530,7 @@ def update(frame_i):
     k = weight_obj.cardinalities[area_idx]
 
     # 重心座標を取得
-    O_x, O_y = gdf_target.iloc[area_idx]['centroids'].coords[0] # 経度, 緯度
+    O_x, O_y = gdf_target.loc[area_idx, 'centroids'].coords[0] # 対象区域の座標
 
     # バンド幅の座標を計算
     t_vec = np.linspace(start=0.0, stop=2.0*np.pi, num=361) # ラジアン
@@ -585,12 +585,12 @@ def update(frame_i):
     ### ヒートマップの作図 -----
 
     # 枠線の表示位置を設定
-    target_bool_mat = np.tile(True, reps=weight_mat.shape)
+    target_bool_mat   = np.tile(True, reps=weight_mat.shape)
     target_bool_mat[area_idx] = False
     target_masked_mat = np.ma.masked_array(weight_mat, target_bool_mat) # 対象区域 - 全区域
-    adj_bool_mat = np.tile(True, reps=weight_mat.shape)
+    adj_bool_mat      = np.tile(True, reps=weight_mat.shape)
     adj_bool_mat[area_idx, adj_idx] = False
-    adj_masked_mat = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
+    adj_masked_mat    = np.ma.masked_array(weight_mat, adj_bool_mat) # 対象区域 - 隣接区域
 
     # ヒートマップを描画
     ax = axes[0, 1]
@@ -635,6 +635,11 @@ def update(frame_i):
 
     # 関数曲線を描画
     ax = axes[1, 0]
+    ax.hlines(
+        y=f_d_vals[d_vals <= h_km], xmin=0.0, xmax=d_vals[d_vals <= h_km], 
+        color='C0', linewidth=1.0, 
+        zorder=9
+    ) # 距離
     ax.vlines(
         x=d_vals, ymin=w_min, ymax=w_max, 
         colors='black', linewidths=1.0, linestyles=':', 
@@ -742,7 +747,7 @@ def update(frame_i):
     ax.set_ylim(ymin=w_min, ymax=f_z_max)
     ax2y.set_ylim(ymin=w_min, ymax=f_z_max)
     ax.set_xlabel('$z = \\frac{d}{h}$')
-    fnc_lbl = '$w = f(z) = \\frac{1}{\\sqrt{2 \\pi}} \\exp(-\\frac{1}{2} z^2)\ (z < 1)$'
+    fnc_lbl = '$w = f(z) = \\frac{1}{\\sqrt{2 \\pi}} \\exp(-\\frac{1}{2} z^2)\ (z \\leq 1)$'
     ax.set_ylabel(fnc_lbl)
     ax.legend(loc='upper right')
     ax.grid()
@@ -773,10 +778,6 @@ frame_num = 101
 h_km_vals = np.linspace(start=0.0, stop=10.0, num=frame_num)
 print(h_km_vals[:5])
 
-# バンド幅の変換係数を作成
-km_per_degree = 111.32
-degree_per_km = 1.0/km_per_degree
-
 
 # 区域数を取得
 N = len(gdf_target)
@@ -786,17 +787,12 @@ N = len(gdf_target)
 
 ### 作図 -----
 
-# カラーマップを作成
-cmap = LinearSegmentedColormap.from_list(
-    name='white_red',
-    colors=['white', 'red']
-)
-
 # 軸の範囲を設定
 u = 5.0
 k_min, k_max = 0.0, N
 k_max = np.ceil(k_max /u)*u  # u単位で切り上げ
 w_min, w_max = 0.0, 1.0 # 最小値・最大値
+
 
 # グラフオブジェクトを初期化
 fig, axes = plt.subplots(
@@ -838,8 +834,8 @@ def update(frame_i):
     ### パラメータの設定 -----
 
     # バンド幅を取得
-    h_km  = h_km_vals[frame_i]   # 度単位の距離
-    h_deg = degree_per_km * h_km # キロメートル単位の距離
+    h_km  = h_km_vals[frame_i]   # キロメートル単位の距離
+    h_deg = degree_per_km * h_km # 度単位の距離
 
     # 空間重み行列を作成
     weight_obj = weights.distance.Kernel.from_dataframe(
